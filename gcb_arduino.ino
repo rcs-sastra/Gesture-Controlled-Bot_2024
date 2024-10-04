@@ -20,7 +20,7 @@ const int ledpin = D5;  // GPIO2 onboard LED
 int duration;
 int distance;
 
-const int threshold_distance = 21+;
+const int threshold_distance = 21;
 
 WiFiServer server(12345); // Changed port number
 
