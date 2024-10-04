@@ -1,172 +1,168 @@
 #include <ESP8266WiFi.h>
 
-// Object Detection and alerting:
-const int trigPin = 18;
-const int echoPin = 5;
-const int buzzerPin = 33;
-long duration = 0;
-int distance = 0;
-const int threshold_distance = 7;
-// Led Pins:
-const int ledPin_Object = 25;
-const int ledPin1 = 26;
-const int ledPin2 = 27;
-const int ledPin3 = 14;
-const int ledPin4 = 12;
-
 // Set these to your desired credentials
-const char *ssid = "ESP32_AP";
+const char *ssid = "ESP8266_AP";
 const char *password = "123456789";
-const int motorPin1 = 35;
-const int motorPin2 = 32;
-const int motorPin3 = 21;
-const int motorPin4 = 19;
-WiFiServer server(12345);
 
-unsigned long lastDistanceCheck = 0;
-const unsigned long distanceCheckInterval = 100; // Check distance every 100ms
+// Motor control pins (use valid GPIO pins)
+const int motorPin1 = D1; // GPIO5
+const int motorPin2 = D2; // GPIO4
+const int motorPin3 = D3; // GPIO0
+const int motorPin4 = D4; // GPIO2 (also onboard LED)
 
-bool obstacleDetected = false;
+// Ultrasonic sensor pins
+const int trigpin = D6;  // GPIO12
+const int echopin = D7;  // GPIO13
+
+// LED pin (replaced D8 with GPIO2)
+const int ledpin = D5;  // GPIO2 onboard LED
+
+int duration;
+int distance;
+
+const int threshold_distance = 21+;
+
+WiFiServer server(12345); // Changed port number
 
 void setup() {
+  // Initialize serial communication
   Serial.begin(115200);
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-  pinMode(buzzerPin, OUTPUT);
-  digitalWrite(buzzerPin, LOW);
-  pinMode(ledPin_Object, OUTPUT);
-  pinMode(ledPin1, OUTPUT);
-  pinMode(ledPin2, OUTPUT);
-  pinMode(ledPin3, OUTPUT);
-  pinMode(ledPin4, OUTPUT);
+
+  // Initialize motor and sensor pins
   pinMode(motorPin1, OUTPUT);
   pinMode(motorPin2, OUTPUT);
   pinMode(motorPin3, OUTPUT);
   pinMode(motorPin4, OUTPUT);
+  pinMode(trigpin, OUTPUT);
+  pinMode(echopin, INPUT);
+  pinMode(ledpin, OUTPUT);
 
+  // Set up the access point
   WiFi.softAP(ssid, password);
   Serial.println();
   Serial.print("Access Point \"");
   Serial.print(ssid);
   Serial.println("\" started");
+
+  // Print the IP address
   Serial.print("IP address:\t");
   Serial.println(WiFi.softAPIP());
+
+  // Start the server
   server.begin();
 }
 
-int measureDistance() {
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH);
-  return duration * 0.0344 / 2;
-}
-
-void handleObstacle() {
-  obstacleDetected = true;
-  digitalWrite(ledPin_Object, HIGH);
-  digitalWrite(buzzerPin, HIGH);
-  delay(100);
-  digitalWrite(ledPin_Object, LOW);
-  digitalWrite(buzzerPin, LOW);
-}
-
-void controlMovement(int command) {
-  if (obstacleDetected && command == 1) {
-    // If obstacle detected and trying to move forward, stop instead
-    command = 0;
-  }
-
-  switch (command) {
-    case 1: // Forward
-      digitalWrite(ledPin1, HIGH);
-      digitalWrite(ledPin3, HIGH);
-      digitalWrite(ledPin2, LOW);
-      digitalWrite(ledPin4, LOW);
-      digitalWrite(motorPin1, LOW);
-      digitalWrite(motorPin2, HIGH);
-      digitalWrite(motorPin3, HIGH);
-      digitalWrite(motorPin4, LOW);
-      break;
-    case 2: // Reverse
-      digitalWrite(ledPin2, HIGH);
-      digitalWrite(ledPin4, HIGH);
-      digitalWrite(ledPin1, LOW);
-      digitalWrite(ledPin3, LOW);
-      digitalWrite(motorPin1, HIGH);
-      digitalWrite(motorPin2, LOW);
-      digitalWrite(motorPin3, LOW);
-      digitalWrite(motorPin4, HIGH);
-      break;
-    case 3: // Right
-      digitalWrite(ledPin1, HIGH);
-      digitalWrite(ledPin2, HIGH);
-      digitalWrite(ledPin3, LOW);
-      digitalWrite(ledPin4, LOW);
-      digitalWrite(motorPin1, HIGH);
-      digitalWrite(motorPin2, LOW);
-      digitalWrite(motorPin3, HIGH);
-      digitalWrite(motorPin4, LOW);
-      break;
-    case 4: // Left
-      digitalWrite(ledPin3, HIGH);
-      digitalWrite(ledPin4, HIGH);
-      digitalWrite(ledPin1, LOW);
-      digitalWrite(ledPin2, LOW);
-      digitalWrite(motorPin1, LOW);
-      digitalWrite(motorPin2, HIGH);
-      digitalWrite(motorPin3, LOW);
-      digitalWrite(motorPin4, HIGH);
-      break;
-    default: // Stop
-      digitalWrite(motorPin1, LOW);
-      digitalWrite(motorPin2, LOW);
-      digitalWrite(motorPin3, LOW);
-      digitalWrite(motorPin4, LOW);
-      digitalWrite(ledPin1, LOW);
-      digitalWrite(ledPin2, LOW);
-      digitalWrite(ledPin3, LOW);
-      digitalWrite(ledPin4, LOW);
-      break;
-  }
-}
-
 void loop() {
-  WiFiClient client = server.available();
   
+  // Check for client connection
+  WiFiClient client = server.available();
   if (client) {
     Serial.println("Client connected");
     while (client.connected()) {
-      unsigned long currentMillis = millis();
-      
-      // Check distance periodically
-      if (currentMillis - lastDistanceCheck >= distanceCheckInterval) {
-        distance = measureDistance();
-        lastDistanceCheck = currentMillis;
-        
-        if (distance < threshold_distance) {
-          handleObstacle();
-        } else {
-          obstacleDetected = false;
-        }
-      }
-      
       if (client.available()) {
         String message = client.readStringUntil('\n');
         Serial.print("Received: ");
         Serial.println(message);
-        
-        int command = message.toInt();
-        controlMovement(command);
-        
-        // Send distance and obstacle status back to the client
-        String response = String(distance) + "," + String(obstacleDetected) + "\n";
-        client.print(response);
+        client.print(message); // Echo the message back to the client
+
+        // Object detection, stop car and turn on LED
+    // Measure distance using ultrasonic sensor
+    digitalWrite(trigpin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigpin, HIGH);
+   delayMicroseconds(10);
+    digitalWrite(trigpin, LOW);
+   duration = pulseIn(echopin, HIGH);
+   distance = duration * 0.0343 / 2;
+   Serial.print("Distance: ");
+   Serial.print(distance);
+   Serial.println(" cm");
+
+       
+          // Turn off LED and perform motor movements based on command
+          digitalWrite(ledpin, LOW);
+          Serial.print("No object, received command: ");
+          Serial.println(message);
+          if (message == "1") {
+             if (distance <= threshold_distance) {
+          digitalWrite(ledpin, HIGH);
+          Serial.println("Object detected, stopping car...");
+          stopCar();
+        }
+           else
+           {Serial.println("Moving forward");
+            moveForward();
+           }
+          } else if (message == "2") {
+               Serial.println("Moving backward");
+            moveBackward();
+          }
+          else if (message == "3") {
+             if (distance <= threshold_distance) {
+          digitalWrite(ledpin, HIGH);
+          Serial.println("Object detected, stopping car...");
+          stopCar();
+        }
+           else{
+            Serial.println("Turning left");
+            turnLeft();}
+            
+          } else if (message == "4") {
+             if (distance <= threshold_distance) {
+          digitalWrite(ledpin, HIGH);
+          Serial.println("Object detected, stopping car...");
+          stopCar();
+        }
+          else { Serial.println("Turning right");
+            turnRight();}
+          } else if (message == "0") {
+            Serial.println("Stopping car");
+            stopCar();
+          }
       }
     }
     client.stop();
     Serial.println("Client disconnected");
   }
+}
+
+// Motor control functions
+void turnLeft() {
+  digitalWrite(motorPin1, HIGH);
+  digitalWrite(motorPin2, LOW);
+  digitalWrite(motorPin3, HIGH);
+  digitalWrite(motorPin4, LOW);
+  Serial.println("Turning left");
+}
+
+void turnRight() {
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin2, HIGH);
+  digitalWrite(motorPin3, LOW);
+  digitalWrite(motorPin4, HIGH);
+  Serial.println("Turning right");
+}
+
+void moveForward() {
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin2, HIGH);
+  digitalWrite(motorPin3, HIGH);
+  digitalWrite(motorPin4, LOW);
+  Serial.println("Moving forward");
+}
+
+void moveBackward() {
+  digitalWrite(motorPin1, HIGH);
+  digitalWrite(motorPin2, LOW);
+  digitalWrite(motorPin3, LOW);
+  digitalWrite(motorPin4, HIGH);
+  Serial.println("Moving backward");
+}
+
+void stopCar() {
+  digitalWrite(motorPin1, LOW);
+  digitalWrite(motorPin2, LOW);
+  digitalWrite(motorPin3, LOW);
+  digitalWrite(motorPin4, LOW);
+  Serial.println("Car stopped");
 }
